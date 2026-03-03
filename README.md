@@ -1,292 +1,96 @@
-# 🚀 Production Deployment Guide
+# Production Deployment Guide for Ollama on Hostinger VPS
 
-# Ollama on 16GB Ubuntu VPS (Hostinger)
+## Introduction
+This guide provides comprehensive steps to deploy Ollama on a Hostinger VPS, integrating best practices for security, monitoring, and troubleshooting.
 
-------------------------------------------------------------------------
+## Prerequisites
+- A Hostinger VPS account.
+- Docker and Docker Compose installed.
+- Basic knowledge of Linux commands.
 
-## 📌 Overview
+## Step 1: Prepare Your VPS
+1. **Access your VPS via SSH**:
+   ```bash
+   ssh username@your_vps_ip
+   ```
+2. **Update the system**:
+   ```bash
+   sudo apt update && sudo apt upgrade -y
+   ```
+3. **Install necessary packages**:
+   ```bash
+   sudo apt install -y curl git
+   ```
 
-This document provides a professional, production-oriented guide for
-deploying Ollama on a 16GB Ubuntu VPS, securing it properly, and
-accessing it remotely using Postman from another system.
+## Step 2: Set Up Docker and Docker Compose
+1. **Install Docker**:
+   ```bash
+   curl -fsSL https://get.docker.com -o get-docker.sh
+   sh get-docker.sh
+   ```
+2. **Install Docker Compose**:
+   ```bash
+   sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+   sudo chmod +x /usr/local/bin/docker-compose
+   ```
 
-This setup is optimized for CPU-based inference and medium-sized coding
-models (6B--7B range).
-
-------------------------------------------------------------------------
-
-# 🖥️ Infrastructure Details
-
-  Component           Specification
-  ------------------- --------------------
-  VPS Provider        Hostinger
-  OS                  Ubuntu 22.04 LTS
-  RAM                 16GB
-  Swap                Recommended (16GB)
-  Deployment Method   Docker
-  AI Runtime          Ollama
-  API Port            11434
-
-------------------------------------------------------------------------
-
-# 1️⃣ Initial Server Access
-
-Login to VPS:
-
-``` bash
-ssh root@YOUR_VPS_IP
+## Step 3: Create Docker Network
+Create a dedicated network for your application:
+```bash
+docker network create app-net
 ```
 
-Update system:
-
-``` bash
-apt update && apt upgrade -y
-```
-
-Install Docker:
-
-``` bash
-curl -fsSL https://get.docker.com | sh
-systemctl enable docker
-systemctl start docker
-```
-
-Verify:
-
-``` bash
-docker --version
-```
-
-------------------------------------------------------------------------
-
-# 2️⃣ Deploy Ollama via Docker
-
-Create docker-compose.yml:
-
-``` yaml
-version: "3.8"
-
-services:
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
-    restart: unless-stopped
-    ports:
-      - "11434:11434"
-    environment:
-      - OLLAMA_HOST=0.0.0.0
-    volumes:
-      - ollama_data:/root/.ollama
-
-volumes:
-  ollama_data:
-```
-
-Start service:
-
-``` bash
-docker compose up -d
-```
-
-Verify:
-
-``` bash
-docker ps
-```
-
-------------------------------------------------------------------------
-
-# 3️⃣ Add Swap (Recommended for Stability)
-
-``` bash
-fallocate -l 16G /swapfile
-chmod 600 /swapfile
-mkswap /swapfile
-swapon /swapfile
-```
-
-Make persistent:
-
-``` bash
-echo '/swapfile none swap sw 0 0' >> /etc/fstab
-```
-
-Check:
-
-``` bash
-free -h
-```
-
-------------------------------------------------------------------------
-
-# 4️⃣ Install Recommended Model (For 16GB CPU VPS)
-
-Example:
-
-``` bash
-docker exec -it ollama ollama pull deepseek-coder:6.7b
-```
-
-Run:
-
-``` bash
-docker exec -it ollama ollama run deepseek-coder:6.7b
-```
-
-------------------------------------------------------------------------
-
-# 5️⃣ Expose API for External Access
-
-Ensure firewall allows port 11434:
-
-``` bash
-ufw allow 11434
-ufw enable
-```
-
-Test locally:
-
-``` bash
-curl http://localhost:11434/api/tags
-```
-
-Test externally:
-
-``` bash
-curl http://YOUR_VPS_IP:11434/api/tags
-```
-
-------------------------------------------------------------------------
-
-# 6️⃣ Access Ollama from Postman (Remote System)
-
-### Endpoint
-
-POST\
-http://YOUR_VPS_IP:11434/api/chat
-
-### Headers
-
-Content-Type: application/json
-
-### Body (JSON)
-
-``` json
-{
-  "model": "deepseek-coder:6.7b",
-  "messages": [
-    {
-      "role": "user",
-      "content": "Build a production agentic framework in Python"
-    }
-  ],
-  "stream": false
-}
-```
-
-Response will appear inside:
-
-    message.content
-
-------------------------------------------------------------------------
-
-# 7️⃣ Performance Expectations (CPU-Only VPS)
-
-  Metric              Expected
-  ------------------- ------------
-  First Token Delay   5--20 sec
-  Full Response       30--90 sec
-  CPU Usage           90--100%
-  RAM Usage           6--10GB
-
-This is normal for CPU inference.
-
-------------------------------------------------------------------------
-
-# 8️⃣ Security Best Practices (Production)
-
-⚠️ Do NOT expose raw port 11434 in production without protection.
-
-Recommended:
-
--   Reverse Proxy (Nginx)
--   Basic Auth or JWT Authentication
--   Rate Limiting
--   Fail2Ban
--   Firewall Restrictions (allow specific IP only)
-
-------------------------------------------------------------------------
-
-# 9️⃣ Removing Large / Failed Models
-
-List models:
-
-``` bash
-docker exec -it ollama ollama list
-```
-
-Remove model:
-
-``` bash
-docker exec -it ollama ollama rm MODEL_NAME
-```
-
-------------------------------------------------------------------------
-
-# 🔟 Troubleshooting
-
-### Error: Model requires more memory
-
-Cause: Model too large for 16GB RAM\
-Solution: Use 6B--7B models only
-
-### Connection Refused
-
--   Check docker container running
--   Check firewall
--   Verify port mapping
-
-------------------------------------------------------------------------
-
-# 📊 Recommended Model Sizes for 16GB VPS
-
-  Model Size   Status
-  ------------ -----------------
-  3B           Very Safe
-  6--7B        Ideal
-  13B          Risky
-  24B+         Not Recommended
-  80B          Impossible
-
-------------------------------------------------------------------------
-
-# 🏗 Architecture Diagram
-
-Remote System (Postman) ↓ Public VPS IP ↓ Docker Container (Ollama) ↓
-Coding Model (6.7B)
-
-------------------------------------------------------------------------
-
-# 🎯 Conclusion
-
-This setup provides:
-
--   Stable CPU-based LLM inference
--   Remote API access
--   Dockerized deployment
--   Persistent model storage
--   Production-ready base for agentic AI systems
-
-------------------------------------------------------------------------
-
-# 📌 Recommended Next Steps
-
--   Add HTTPS using Nginx + SSL
--   Add authentication middleware
--   Build FastAPI wrapper
--   Integrate vector database for RAG
--   Deploy monitoring (Prometheus + Grafana)
-
-------------------------------------------------------------------------
-
-**Production Base Infrastructure Successfully Established 🚀**
+## Step 4: Docker Compose Configuration
+1. **Create a `docker-compose.yml` file**:
+   ```yaml
+   version: '3'
+   services:
+     ollama:
+       image: your-ollama-image
+       networks:
+         - app-net
+       ports:
+         - "80:80"
+       environment:
+         - ENV_VAR=value
+   networks:
+     app-net:
+       driver: bridge
+   ```
+2. **Deploy the application**:
+   ```bash
+   docker-compose up -d
+   ```
+
+## Step 5: Security Hardening
+- **Implement a firewall** using UFW:
+  ```bash
+  sudo ufw allow OpenSSH
+  sudo ufw enable
+  sudo ufw allow 'Nginx Full' # if Nginx is used
+  ```
+- **Regularly update your VPS** to patch vulnerabilities.
+
+## Step 6: Monitoring
+- **Use Docker logs for monitoring**:
+  ```bash
+  docker logs -f ollama
+  ```
+- **Consider integrating monitoring tools** such as Prometheus or Grafana.
+
+## Step 7: Troubleshooting
+- **Check Docker container status**:
+  ```bash
+  docker ps -a
+  ```
+- **Inspect logs for errors**:
+  ```bash
+  docker logs ollama
+  ```
+- **Ensure correct networking**:
+  ```bash
+  docker network inspect app-net
+  ```
+
+## Closing Remarks
+Following these steps will help you deploy Ollama efficiently and securely on Hostinger VPS. Make sure to revisit this guide for updates and additional best practices based on your needs.
